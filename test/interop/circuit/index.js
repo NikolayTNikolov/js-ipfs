@@ -17,8 +17,6 @@ const multiaddr = require('multiaddr')
 chai.use(dirtyChai)
 
 describe('circuit interop', function () {
-  this.timeout(20 * 1000)
-
   let jsTCP
   let jsTCPAddrs
   let jsWS
