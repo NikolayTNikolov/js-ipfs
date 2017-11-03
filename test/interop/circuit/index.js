@@ -8,21 +8,24 @@ const expect = chai.expect
 const parallel = require('async/parallel')
 const series = require('async/series')
 const Factory = require('../../utils/ipfs-factory-daemon')
+const bl = require('bl')
+const waterfall = require('async/waterfall')
 
 const crypto = require('crypto')
-const utils = require('./utils')
+const setupJsNode = require('./utils').setupJsNode
+const setupGoNode = require('./utils').setupGoNode
 
 const multiaddr = require('multiaddr')
 
 chai.use(dirtyChai)
 
+const factory = new Factory()
 describe('circuit interop', function () {
   let jsTCP
   let jsTCPAddrs
   let jsWS
   let jsWSAddrs
   let jsRelayAddrs
-  let factory = new Factory()
 
   let goRelayAddrs
   let goRelayDaemon
@@ -37,24 +40,24 @@ describe('circuit interop', function () {
 
   beforeEach((done) => {
     parallel([
-      (pCb) => utils.setupJsNode([
+      (pCb) => setupJsNode([
         '/ip4/127.0.0.1/tcp/61454/ws',
         '/ip4/127.0.0.1/tcp/61453'
       ], factory, true, pCb),
-      (pCb) => utils.setupJsNode([
+      (pCb) => setupJsNode([
         '/ip4/127.0.0.1/tcp/9002'
       ], factory, pCb),
-      (pCb) => utils.setupJsNode([
+      (pCb) => setupJsNode([
         '/ip4/127.0.0.1/tcp/9003/ws'
       ], factory, pCb),
-      (pCb) => utils.setupGoNode([
+      (pCb) => setupGoNode([
         '/ip4/0.0.0.0/tcp/0/ws',
         '/ip4/0.0.0.0/tcp/0'
       ], true, pCb),
-      (pCb) => utils.setupGoNode([
+      (pCb) => setupGoNode([
         '/ip4/0.0.0.0/tcp/0'
       ], pCb),
-      (pCb) => utils.setupGoNode([
+      (pCb) => setupGoNode([
         '/ip4/0.0.0.0/tcp/0/ws'
       ], pCb)
     ], (err, res) => {
@@ -87,7 +90,7 @@ describe('circuit interop', function () {
     ], done)
   })
 
-  it('jsWS <-> jsRelay <-> jsTCP', function (done) {
+  it('jsWS <-> jsRelay <-> jsTCP', (done) => {
     const data = crypto.randomBytes(128)
     series([
       (cb) => jsWS.swarm.connect(jsRelayAddrs[0], cb),
@@ -96,18 +99,15 @@ describe('circuit interop', function () {
       (cb) => jsTCP.swarm.connect(jsWSAddrs[0], cb)
     ], (err) => {
       expect(err).to.not.exist()
-      utils.addAndCat(data,
-        jsWS,
-        jsTCP,
-        (err, data) => {
-          expect(err).to.not.exist()
-          expect(data).to.be.equal(data)
-          done()
-        })
+      waterfall([
+        (cb) => jsTCP.files.add(data, cb),
+        (res, cb) => jsWS.files.cat(res[0].hash, cb),
+        (stream, cb) => stream.pipe(bl(cb))
+      ], done)
     })
   })
 
-  it('goWS <-> jsRelay <-> goTCP', function (done) {
+  it('goWS <-> jsRelay <-> goTCP', (done) => {
     const data = crypto.randomBytes(128)
     series([
       (cb) => goWS.swarm.connect(jsRelayAddrs[0], cb),
@@ -116,18 +116,15 @@ describe('circuit interop', function () {
       (cb) => goTCP.swarm.connect(`/p2p-circuit/ipfs/${multiaddr(goWSAddrs[0]).getPeerId()}`, cb)
     ], (err) => {
       expect(err).to.not.exist()
-      utils.addAndCat(data,
-        goWS,
-        goTCP,
-        (err, data) => {
-          expect(err).to.not.exist()
-          expect(data).to.be.equal(data)
-          done()
-        })
+      waterfall([
+        (cb) => goTCP.files.add(data, cb),
+        (res, cb) => goWS.files.cat(res[0].hash, cb),
+        (stream, cb) => stream.pipe(bl(cb))
+      ], done)
     })
   })
 
-  it('jsWS <-> jsRelay <-> goTCP', function (done) {
+  it('jsWS <-> jsRelay <-> goTCP', (done) => {
     const data = crypto.randomBytes(128)
     series([
       (cb) => jsWS.swarm.connect(jsRelayAddrs[0], cb),
@@ -136,18 +133,15 @@ describe('circuit interop', function () {
       (cb) => goTCP.swarm.connect(jsWSAddrs[0], cb)
     ], (err) => {
       expect(err).to.not.exist()
-      utils.addAndCat(data,
-        jsWS,
-        goTCP,
-        (err, data) => {
-          expect(err).to.not.exist()
-          expect(data).to.be.equal(data)
-          done()
-        })
+      waterfall([
+        (cb) => goTCP.files.add(data, cb),
+        (res, cb) => jsWS.files.cat(res[0].hash, cb),
+        (stream, cb) => stream.pipe(bl(cb))
+      ], done)
     })
   })
 
-  it('jsTCP <-> goRelay <-> jsWS', function (done) {
+  it('jsTCP <-> goRelay <-> jsWS', (done) => {
     const data = crypto.randomBytes(128)
     series([
       (cb) => jsTCP.swarm.connect(goRelayAddrs[2], cb),
@@ -156,18 +150,15 @@ describe('circuit interop', function () {
       (cb) => jsWS.swarm.connect(jsTCPAddrs[0], cb)
     ], (err) => {
       expect(err).to.not.exist()
-      utils.addAndCat(data,
-        jsWS,
-        jsTCP,
-        (err, data) => {
-          expect(err).to.not.exist()
-          expect(data).to.be.equal(data)
-          done()
-        })
+      waterfall([
+        (cb) => jsTCP.files.add(data, cb),
+        (res, cb) => jsWS.files.cat(res[0].hash, cb),
+        (stream, cb) => stream.pipe(bl(cb))
+      ], done)
     })
   })
 
-  it('goTCP <-> goRelay <-> goWS', function (done) {
+  it('goTCP <-> goRelay <-> goWS', (done) => {
     const data = crypto.randomBytes(128)
     series([
       (cb) => goWS.swarm.connect(goRelayAddrs[0], cb),
@@ -176,18 +167,15 @@ describe('circuit interop', function () {
       (cb) => goWS.swarm.connect(`/p2p-circuit/ipfs/${multiaddr(goTCPAddrs[0]).getPeerId()}`, cb)
     ], (err) => {
       expect(err).to.not.exist()
-      utils.addAndCat(data,
-        goWS,
-        goTCP,
-        (err, data) => {
-          expect(err).to.not.exist()
-          expect(data).to.be.equal(data)
-          done()
-        })
+      waterfall([
+        (cb) => goTCP.files.add(data, cb),
+        (res, cb) => goWS.files.cat(res[0].hash, cb),
+        (stream, cb) => stream.pipe(bl(cb))
+      ], done)
     })
   })
 
-  it('jsWS <-> goRelay <-> goTCP', function (done) {
+  it('jsWS <-> goRelay <-> goTCP', (done) => {
     const data = crypto.randomBytes(128)
     series([
       (cb) => jsWS.swarm.connect(goRelayAddrs[0], cb),
@@ -196,14 +184,11 @@ describe('circuit interop', function () {
       (cb) => goTCP.swarm.connect(`/p2p-circuit/ipfs/${multiaddr(jsWSAddrs[0]).getPeerId()}`, cb)
     ], (err) => {
       expect(err).to.not.exist()
-      utils.addAndCat(data,
-        jsWS,
-        goTCP,
-        (err, data) => {
-          expect(err).to.not.exist()
-          expect(data).to.be.equal(data)
-          done()
-        })
+      waterfall([
+        (cb) => goTCP.files.add(data, cb),
+        (res, cb) => jsWS.files.cat(res[0].hash, cb),
+        (stream, cb) => stream.pipe(bl(cb))
+      ], done)
     })
   })
 })

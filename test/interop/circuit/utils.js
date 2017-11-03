@@ -5,11 +5,8 @@
 const chai = require('chai')
 const expect = chai.expect
 const waterfall = require('async/waterfall')
-const bl = require('bl')
 
-const createTempRepo = require('../../utils/create-repo-nodejs')
 const relayConfig = require('../../utils/ipfs-factory-daemon/default-config.json')
-
 const GoDaemon = require('../daemons/go')
 
 exports.setupGoNode = function setupGoNode (addrs, hop, cb) {
@@ -59,7 +56,7 @@ exports.setupJsNode = function setupJsNode (addrs, factory, hop, cb) {
 
   waterfall([
     (pCb) => {
-      factory.spawnNode(createTempRepo(), Object.assign(relayConfig, {
+      factory.spawnNode(null, Object.assign(relayConfig, {
         Addresses: {
           Swarm: addrs,
           API: `/ip4/0.0.0.0/tcp/0`,
@@ -90,12 +87,4 @@ exports.setupJsNode = function setupJsNode (addrs, factory, hop, cb) {
     expect(err).to.not.exist()
     cb(null, relayPeer, relayAddrs)
   })
-}
-
-exports.addAndCat = function addAndCat (data, ipfsSrc, ipfsDst, callback) {
-  waterfall([
-    (cb) => ipfsDst.files.add(data, cb),
-    (res, cb) => ipfsSrc.files.cat(res[0].hash, cb),
-    (stream, cb) => stream.pipe(bl(cb))
-  ], callback)
 }

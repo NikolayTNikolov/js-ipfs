@@ -44,7 +44,6 @@ describe('circuit', function () {
   let nodeId2
 
   before(function (done) {
-    // this.timeout(20 * 1000)
     factory = new IPFSFactory()
 
     parallel([
