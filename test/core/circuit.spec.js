@@ -103,11 +103,11 @@ describe('circuit', function () {
 
   after((done) => factory.dismantle(done))
 
-  it('node1 <-> jsRelay <-> node2', function (done) {
+  it('node1 <-> goRelay <-> node2', function (done) {
     const data = crypto.randomBytes(128)
     series([
-      (cb) => node1.swarm.connect(jsRelayId, cb),
-      (cb) => node2.swarm.connect(jsRelayId, cb),
+      (cb) => node1.swarm.connect(goRelayId, cb),
+      (cb) => node2.swarm.connect(goRelayId, cb),
       (cb) => setTimeout(cb, 2000),
       (cb) => node1.swarm.connect(nodeId2, cb)
     ], (err) => {
@@ -120,11 +120,11 @@ describe('circuit', function () {
     })
   })
 
-  it('node1 <-> goRelay <-> node2', function (done) {
+  it('node1 <-> jsRelay <-> node2', function (done) {
     const data = crypto.randomBytes(128)
     series([
-      (cb) => node1.swarm.connect(goRelayId, cb),
-      (cb) => node2.swarm.connect(goRelayId, cb),
+      (cb) => node1.swarm.connect(jsRelayId, cb),
+      (cb) => node2.swarm.connect(jsRelayId, cb),
       (cb) => setTimeout(cb, 2000),
       (cb) => node1.swarm.connect(nodeId2, cb)
     ], (err) => {
