@@ -7,19 +7,17 @@ const dirtyChai = require('dirty-chai')
 const expect = chai.expect
 const parallel = require('async/parallel')
 const series = require('async/series')
-const Factory = require('../../utils/ipfs-factory-daemon')
 const bl = require('bl')
 const waterfall = require('async/waterfall')
-
-const crypto = require('crypto')
-const setupJsNode = require('./utils').setupJsNode
-const setupGoNode = require('./utils').setupGoNode
-
 const multiaddr = require('multiaddr')
+const crypto = require('crypto')
+
+const setupJsNode = require('../utils/spawn-tools').spawnJsNode
+const setupGoNode = require('../utils/spawn-tools').spawnGoNode
+const stopNodes = require('../utils/spawn-tools').stopNodes
 
 chai.use(dirtyChai)
 
-const factory = new Factory()
 describe('circuit interop', function () {
   let jsTCP
   let jsTCPAddrs
@@ -28,14 +26,11 @@ describe('circuit interop', function () {
   let jsRelayAddrs
 
   let goRelayAddrs
-  let goRelayDaemon
 
   let goTCPAddrs
-  let goTCPDaemon
   let goTCP
 
   let goWSAddrs
-  let goWSDaemon
   let goWS
 
   beforeEach((done) => {
@@ -43,13 +38,13 @@ describe('circuit interop', function () {
       (pCb) => setupJsNode([
         '/ip4/127.0.0.1/tcp/61454/ws',
         '/ip4/127.0.0.1/tcp/61453'
-      ], factory, true, pCb),
+      ], true, pCb),
       (pCb) => setupJsNode([
         '/ip4/127.0.0.1/tcp/9002'
-      ], factory, pCb),
+      ], pCb),
       (pCb) => setupJsNode([
         '/ip4/127.0.0.1/tcp/9003/ws'
-      ], factory, pCb),
+      ], pCb),
       (pCb) => setupGoNode([
         '/ip4/0.0.0.0/tcp/0/ws',
         '/ip4/0.0.0.0/tcp/0'
@@ -69,26 +64,16 @@ describe('circuit interop', function () {
       jsWS = res[2][0]
       jsWSAddrs = res[2][1].map((a) => a.toString()).filter((a) => a.includes('/p2p-circuit'))
 
-      goRelayDaemon = res[3][0]
       goRelayAddrs = res[3][1]
       goTCP = res[4][0].api
-      goTCPDaemon = res[4][0]
       goTCPAddrs = res[4][1]
       goWS = res[5][0].api
-      goWSDaemon = res[5][0]
       goWSAddrs = res[5][1]
       done()
     })
   })
 
-  afterEach((done) => {
-    parallel([
-      (cb) => factory.dismantle(cb),
-      (cb) => goRelayDaemon.stop(cb),
-      (cb) => goTCPDaemon.stop(cb),
-      (cb) => goWSDaemon.stop(cb)
-    ], done)
-  })
+  afterEach(stopNodes)
 
   it('jsWS <-> jsRelay <-> jsTCP', (done) => {
     const data = crypto.randomBytes(128)
